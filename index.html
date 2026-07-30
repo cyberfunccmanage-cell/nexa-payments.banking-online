@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Checkout | Secure Payment Gateway</title>
- <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     :root {
       --bg: #07090e;
@@ -137,25 +136,28 @@
     </form>
   </div>
 
-  <script>
-  // ⚠️ API KEYS HERE
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+
+<script>
+  // 🔴 APNI REAL SUPABASE KEYS NACHAY WALE QUOTES ("") KE ANDAR PASTE KAREIN:
   const SUPABASE_URL = "https://vkqeqjuobqnzxdwdlhdo.supabase.co";
   const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZrcWVxanVvYnFuenhkd2RsaGRvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0MzYyMDgsImV4cCI6MjEwMTAxMjIwOH0.K-3BVayX-30Fe2EyAYsF21vEEStUOWnHKTJoOWJk34g";
 
   let _supabase = null;
 
-  // Function to initialize Supabase safely
   function initSupabase() {
     if (window.supabase) {
-      _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-      console.log("Supabase Client Initialized Successfully!");
-    } else {
-      console.error("Supabase CDN failed to load.");
+      try {
+        _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        console.log("Supabase Client Loaded!");
+      } catch(e) {
+        console.error("Invalid Supabase URL or Key format", e);
+      }
     }
   }
 
-  // Run initialization when page fully loads
-  window.addEventListener('load', () => {
+  // Run on page load
+  window.addEventListener('DOMContentLoaded', () => {
     initSupabase();
 
     const amountInput = document.getElementById('amount');
@@ -200,14 +202,13 @@
         alertBox.style.display = 'none';
         loadingOverlay.style.display = 'flex';
 
-        // Re-check if supabase client exists
-        if (!_supabase && window.supabase) {
-          _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        if (!_supabase) {
+          initSupabase();
         }
 
-        if (!_supabase) {
+        if (!_supabase || SUPABASE_URL.includes("YOUR_SUPABASE_PROJECT_URL")) {
           loadingOverlay.style.display = 'none';
-          alertBox.textContent = "Supabase CDN blocked by network/adblocker. Please check connection.";
+          alertBox.textContent = "Error: Please replace 'YOUR_SUPABASE_PROJECT_URL' with your real Supabase URL in index.html.";
           alertBox.style.display = 'block';
           return;
         }
